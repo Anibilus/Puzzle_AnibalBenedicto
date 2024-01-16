@@ -2,11 +2,17 @@ package com.example.puzzle_anibalbenedicto.Niveles;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 
 import com.example.puzzle_anibalbenedicto.DatabaseHelper;
 import com.example.puzzle_anibalbenedicto.R;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 
 import android.view.ViewGroup;
@@ -18,6 +24,20 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 
+import android.os.Bundle;
+import android.view.View;
+import android.widget.GridLayout;
+import android.widget.ImageButton;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+
 public class NivelUnoActivity extends AppCompatActivity {
 
     private static final int FILAS = 2;
@@ -27,40 +47,43 @@ public class NivelUnoActivity extends AppCompatActivity {
     private int intentos = 0; // Contador de intentos
     private TextView textViewIntentos;
     private DatabaseHelper dbHelper;
+    private List<Integer> listaRecursosImagenes = Arrays.asList(
+            R.drawable.imagen1,
+            R.drawable.imagen2,
+            R.drawable.imagen3,
+            R.drawable.imagen4,
+            R.drawable.imagen5,
+            R.drawable.imagen6,
+            R.drawable.imagen7,
+            R.drawable.imagen8
+    );
+    private final int[][] posicionesCorrectas = {
+            {0, 0}, {0, 1}, {0, 2}, {0, 3},
+            {1, 0}, {1, 1}, {1, 2}, {1, 3}
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.selector_nvl1);
 
-        // Obtener el GridLayout que contendrá los ImageButton
+        // Obtener el GridLayout y el TextView
         GridLayout gridLayout = findViewById(R.id.gridLayoutNivelUno);
         textViewIntentos = findViewById(R.id.textViewIntentos);
+
+        // Obtener una instancia de DatabaseHelper
         dbHelper = new DatabaseHelper(this);
-        // Crear una matriz de ImageButton
+
+        // Inicializar la matriz de ImageButton
         imageButtons = new ImageButton[FILAS][COLUMNAS];
 
-        // Obtener un arreglo de recursos de imágenes
-        int[] imagenes = {
-                R.drawable.imagen1,
-                R.drawable.imagen2,
-                R.drawable.imagen3,
-                R.drawable.imagen4,
-                R.drawable.imagen5,
-                R.drawable.imagen6,
-                R.drawable.imagen7,
-                R.drawable.imagen8
-        };
-
-        // Desordenar el arreglo de imágenes
-        shuffleArray(imagenes);
-
-        // Crear y configurar los ImageButton en el GridLayout
+        // Llenar la matriz con referencias a los ImageButton en el GridLayout
         for (int i = 0; i < FILAS; i++) {
             for (int j = 0; j < COLUMNAS; j++) {
-                imageButtons[i][j] = new ImageButton(this);
-                imageButtons[i][j].setImageResource(imagenes[i * COLUMNAS + j]);
-                imageButtons[i][j].setScaleType(ImageView.ScaleType.FIT_CENTER);
+                String buttonID = "imageButton" + ((i * COLUMNAS) + j + 1);
+                int resID = getResources().getIdentifier(buttonID, "id", getPackageName());
+                imageButtons[i][j] = findViewById(resID);
 
                 // Añadir OnClickListener a cada ImageButton
                 imageButtons[i][j].setOnClickListener(new View.OnClickListener() {
@@ -69,17 +92,24 @@ public class NivelUnoActivity extends AppCompatActivity {
                         onImageButtonClick((ImageButton) v);
                     }
                 });
-
-                GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-                params.width = 0;
-                params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                params.columnSpec = GridLayout.spec(j, 1f);
-                params.rowSpec = GridLayout.spec(i, 1f);
-
-                gridLayout.addView(imageButtons[i][j], params);
             }
         }
+
+        // Desordenar las imágenes
+        shuffleImages();
+
+        // Configurar el contador de intentos
         updateIntentosCounter();
+    }
+
+    // Método para desordenar las imágenes
+    private void shuffleImages() {
+        Collections.shuffle(listaRecursosImagenes);
+        for (int i = 0; i < FILAS; i++) {
+            for (int j = 0; j < COLUMNAS; j++) {
+                imageButtons[i][j].setImageResource(listaRecursosImagenes.get(i * COLUMNAS + j));
+            }
+        }
     }
 
     // Método para desordenar un arreglo
@@ -93,16 +123,39 @@ public class NivelUnoActivity extends AppCompatActivity {
             array[i] = temp;
         }
     }
+    private int getImageResourceId(ImageButton imageButton) {
+        Drawable drawable = imageButton.getDrawable();
+        if (drawable != null) {
+            return getDrawableResourceId(drawable);
+        }
+        return 0;
+    }
+    private int getDrawableResourceId(Drawable drawable) {
+        if (drawable instanceof BitmapDrawable) {
+            try {
+                Field field = BitmapDrawable.class.getDeclaredField("mBitmapState");
+                field.setAccessible(true);
+                Object bitmapState = field.get(drawable);
+                Field bitmapField = bitmapState.getClass().getDeclaredField("mBitmap");
+                bitmapField.setAccessible(true);
+                Bitmap bitmap = (Bitmap) bitmapField.get(bitmapState);
 
-    // Método llamado al hacer clic en un ImageButton
+                // Devuelve el ID del recurso asociado con el Bitmap (puede ser 0 si no se cargó desde un recurso)
+                return bitmapState.hashCode();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return 0;
+    }
     private void onImageButtonClick(ImageButton clickedImageButton) {
         if (selectedImageButton == null) {
             // No hay ninguna imagen seleccionada, seleccionar la actual
             selectedImageButton = clickedImageButton;
         } else {
             // Intercambiar las imágenes
-            int tempResource = selectedImageButton.getImageResource();
-            selectedImageButton.setImageResource(clickedImageButton.getImageResource());
+            int tempResource = getImageResourceId(selectedImageButton);
+            selectedImageButton.setImageResource(getImageResourceId(clickedImageButton));
             clickedImageButton.setImageResource(tempResource);
 
             // Incrementar el contador de intentos
@@ -119,10 +172,14 @@ public class NivelUnoActivity extends AppCompatActivity {
             }
         }
     }
+
+
     // Método para actualizar el contador de intentos en el TextView
     private void updateIntentosCounter() {
         textViewIntentos.setText("Intentos: " + intentos);
     }
+
+    // Método para guardar la puntuación en la base de datos
     private void saveScore() {
         // Obtener el nombre del jugador (puedes implementar la lógica para obtener el nombre)
         String nombreJugador = "NombrePorDefecto";
@@ -132,15 +189,24 @@ public class NivelUnoActivity extends AppCompatActivity {
 
         // Aquí puedes realizar acciones adicionales si lo necesitas, como mostrar un mensaje al jugador, etc.
     }
-    private boolean isPuzzleCompleted() {
-        // Lógica para determinar si todas las imágenes están en la posición correcta
-        // (Debes implementar esta lógica según la mecánica de tu juego)
-        // Puedes, por ejemplo, comparar las imágenes en la matriz imageButtons con la
-        // secuencia original de imágenes desordenadas.
 
-        // En este ejemplo simple, supondremos que el puzzle está completado si el contador
-        // de intentos llega a un cierto límite (puedes ajustar esto según tus necesidades).
-        return intentos <= 10; // Por ejemplo, consideramos completado después de 10 intentos
+    // Método para verificar si el puzzle está completado
+    private boolean isPuzzleCompleted() {
+        for (int i = 0; i < FILAS; i++) {
+            for (int j = 0; j < COLUMNAS; j++) {
+                // Obtener el recurso de la imagen actual
+                int resource = imageButtons[i][j].getImageResource();
+
+                // Obtener la posición correcta de la imagen actual
+                int[] posicionCorrecta = posicionesCorrectas[i * COLUMNAS + j];
+
+                // Verificar si la imagen está en la posición correcta
+                if (resource != listaRecursosImagenes.get(posicionCorrecta[0] * COLUMNAS + posicionCorrecta[1])) {
+                    return false; // Si al menos una imagen está en la posición incorrecta, el puzzle no está completo
+                }
+            }
+        }
+        return true; // Todas las imágenes están en la posición correcta, el puzzle está completo
     }
 }
 
